@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voice Mirror</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{
+  color-scheme:light dark;
+  --bg:#fafaf9; --panel:#ffffff; --ink:#1c1917; --muted:#78716c; --line:#e7e5e4;
+  --model:#2563eb; --you:#ea580c; --bad:#dc2626; --chip:#eff4ff; --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141416; --panel:#1b1b1f; --ink:#f4f4f5; --muted:#a1a1aa; --line:#2c2c31;
+    --model:#6b9dff; --you:#ff9a5c; --bad:#f87171; --chip:#1f2a44;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#141416; --panel:#1b1b1f; --ink:#f4f4f5; --muted:#a1a1aa; --line:#2c2c31;
+  --model:#6b9dff; --you:#ff9a5c; --bad:#f87171; --chip:#1f2a44;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+[hidden]{display:none !important}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.sp{flex:1}
+h1,h2,h3{text-wrap:balance}
+p{text-wrap:pretty}
+
+/* controls */
+button{font:inherit;min-height:44px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:8px 14px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--model)}
+button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--model);outline-offset:2px}
+button.primary{background:var(--model);border-color:var(--model);color:#fff}
+button.rec{background:var(--bad);border-color:var(--bad);color:#fff}
+button.on{background:var(--chip);border-color:var(--model);color:var(--model)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.grow{flex:1}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+label{display:block;font-size:13px;color:var(--muted);margin:14px 0 4px}
+input,select,textarea{font:inherit;width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+textarea{min-height:84px}
+details summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+
+/* header */
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(8px + env(safe-area-inset-top)) 16px 8px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;font-weight:700}
+.drivebar{padding:10px 16px;font-size:14px;background:var(--chip);border-bottom:1px solid var(--line);cursor:pointer}
+.drivebar.err{color:var(--bad)}
+
+/* page */
+main{max-width:640px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:20px}
+.plan{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:0 14px}
+.plan summary{justify-content:space-between}
+.plan[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+.plan .seg{margin-bottom:12px}
+.plan .days{padding-bottom:14px}
+.days{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.days button{padding:0;font-size:14px;font-variant-numeric:tabular-nums}
+.days button.partial{background:var(--chip);border-color:var(--model)}
+.days button.done{background:var(--model);border-color:var(--model);color:#fff}
+.days button.cur{outline:2px solid var(--ink);outline-offset:1px}
+.week{font-size:12px;color:var(--muted);margin:8px 0 0;grid-column:1/-1}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;font-size:14px}
+.seg button.cur,.tabs button.cur{background:var(--chip);border-color:var(--model);color:var(--model)}
+
+.lesson-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lesson-head .nav{display:flex;gap:6px}
+.lesson-head .nav button{min-width:44px;padding:0}
+h2#dayTitle{margin:2px 0 4px;font-size:22px;line-height:1.25}
+#dayMission{margin-top:10px;padding:10px 12px;border-left:3px solid var(--model);background:var(--chip);border-radius:6px;font-size:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px}
+.tabs button{font-size:14px;min-height:40px}
+.drill{font-size:clamp(20px,5.5vw,26px);line-height:1.4;margin:14px 0 4px;font-weight:500;text-wrap:pretty}
+.tag{display:inline-block;font-size:12px;background:var(--chip);color:var(--model);border-radius:999px;padding:2px 8px;margin-right:6px;vertical-align:middle;font-weight:600}
+.stress{color:var(--you)}
+
+.actions{display:flex;flex-direction:column;gap:8px}
+.pill{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted)}
+.status{min-height:22px;font-size:14px;color:var(--muted)}
+.status.err{color:var(--bad)}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+canvas{width:100%;height:220px;display:block;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 16px;margin-top:12px}
+@media (min-width:520px){.metrics{grid-template-columns:repeat(4,1fr)}}
+.metric span{display:block;font-size:12px}
+.metric b{display:block;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+
+.more details{border-top:1px solid var(--line)}
+.more ol{padding-left:20px;margin:0 0 8px}
+.more p{margin:0 0 12px}
+
+/* settings */
+dialog{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--ink);width:calc(100% - 32px);max-width:480px;max-height:calc(100dvh - 32px);padding:20px;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 4px;font-size:19px}
+dialog h4{margin:22px 0 2px;font-size:15px}
+dialog .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+dialog .stack{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Voice Mirror</h1>
+  <button id="btnSettings" aria-label="Settings">Settings</button>
+</header>
+<div class="drivebar" id="driveBar" role="status" hidden></div>
+
+<main>
+  <details class="plan" id="plan">
+    <summary><span id="planTitle">Voice</span><span class="muted small" id="overall"></span></summary>
+    <div class="seg" id="trackSwitch">
+      <button data-track="voice">Voice</button>
+      <button data-track="humour">Humour &amp; Leadership</button>
+    </div>
+    <div class="days" id="days"></div>
+  </details>
+
+  <section>
+    <div class="lesson-head">
+      <div class="muted small" id="weekLabel"></div>
+      <div class="nav">
+        <button id="dayPrev" aria-label="Previous day">‹</button>
+        <button id="dayNext" aria-label="Next day">›</button>
+      </div>
+    </div>
+    <h2 id="dayTitle"></h2>
+    <p class="muted" id="dayTip" style="margin:0"></p>
+    <div id="dayMission" hidden></div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div id="customBox" hidden>
+      <label for="customText">Your sentence (put a key word in CAPS to stress it)</label>
+      <textarea id="customText" placeholder="e.g. We didn't build it for engineers. We built it for DOCTORS."></textarea>
+      <div class="row" style="margin-top:8px">
+        <select id="customStyle" style="width:auto">
+          <option value="">No delivery tag</option>
+          <option>calm</option><option>confident</option><option>warm</option>
+          <option>excited</option><option>serious</option><option>curious</option><option>playful</option><option>amused</option><option>deadpan</option><option>whispers</option>
+        </select>
+        <button id="btnUseCustom">Use this sentence</button>
+      </div>
+    </div>
+
+    <div class="drill" id="drillText"></div>
+    <div class="muted small" id="drillCue"></div>
+  </section>
+
+  <section class="actions">
+    <div class="row">
+      <button class="primary grow" id="btnModel">▶ Play my clone</button>
+      <button id="btnSlow" title="Play at 0.75× speed">0.75×</button>
+      <button id="btnLoop">Loop</button>
+    </div>
+    <div class="trio">
+      <button id="btnEcho" title="Listen, then say it right after">Echo</button>
+      <button id="btnShadow" title="Speak along with the clone (use headphones)">Shadow</button>
+      <button id="btnRec">● Record</button>
+    </div>
+    <div class="row">
+      <button id="btnMine" disabled>▶ Mine</button>
+      <button id="btnAB" disabled>A/B</button>
+      <span class="sp"></span>
+      <span class="pill" id="cacheBadge" hidden>cached · no credits</span>
+    </div>
+    <div class="status" id="status" role="status"></div>
+  </section>
+
+  <section>
+    <div class="legend"><span><i style="background:var(--model)"></i>Clone</span><span><i style="background:var(--you)"></i>You</span></div>
+    <canvas id="plot" width="1000" height="220" role="img" aria-label="Pitch comparison between your clone and your take"></canvas>
+    <div class="metrics">
+      <div class="metric"><span class="muted">Length you / clone</span><b id="mDur">–</b></div>
+      <div class="metric"><span class="muted">Pitch range (st)</span><b id="mRange">–</b></div>
+      <div class="metric"><span class="muted">Melody match</span><b id="mMel">–</b></div>
+      <div class="metric"><span class="muted">Stress match</span><b id="mStr">–</b></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="trio rate">
+      <button id="rAgain">Again</button>
+      <button id="rClose">Close</button>
+      <button id="rNailed">Nailed it ✓</button>
+    </div>
+    <div class="muted small" id="attempts" style="margin-top:8px"></div>
+    <details id="baselineBox" style="margin-top:8px" hidden>
+      <summary>Day 1 vs Day 30</summary>
+      <div id="baselineList" class="small"></div>
+    </details>
+  </section>
+
+  <section class="more">
+    <details>
+      <summary>How to practise (~15 min a day)</summary>
+      <ol class="small">
+        <li><b>Listen</b> to your clone 3×, once at 0.75×. Watch the blue line: where it rises, falls, pauses.</li>
+        <li><b>Echo</b>: listen, then say it right after.</li>
+        <li><b>Shadow</b> (headphones): speak along with it, a split second behind.</li>
+        <li><b>Compare</b>: A/B play, look at the two lines, read the numbers.</li>
+        <li><b>Repeat</b> until you can't hear the difference in A/B. Then mark "Nailed it".</li>
+      </ol>
+      <p class="small muted">The numbers are rough acoustic indicators, not a grade. Your ear in A/B is the real judge.</p>
+    </details>
+    <details>
+      <summary>Why your own voice helps</summary>
+      <p class="small">Imitating a model of <i>your own</i> voice lowers memory load and makes it easier to hear exactly what differs, because timbre is no longer a distraction. Shadowing combined with reading aloud has improved rhythm, intonation and sentence-final lengthening in controlled studies. Gains tend to be specific to what you drill, and they depend on steady, motivated practice, so short daily sessions beat occasional long ones.</p>
+    </details>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <h3>Settings</h3>
+
+    <h4>Voice</h4>
+    <p class="small muted" id="keyNote" hidden style="margin:0">Using the API key from the .env file on this computer.</p>
+    <div id="keyRow">
+      <label for="sKey">ElevenLabs API key (kept only on this device)</label>
+      <input id="sKey" type="password" autocomplete="off">
+    </div>
+    <label for="sVoice">Your voice</label>
+    <div class="row" style="flex-wrap:nowrap">
+      <select id="sVoice"><option value="">Tap Load to list your voices</option></select>
+      <button type="button" id="btnLoadVoices">Load</button>
+    </div>
+    <p class="small muted" id="voiceMsg" style="margin:6px 0 0"></p>
+
+    <h4>Google Drive</h4>
+    <p class="small muted" style="margin:0">Clips, recordings and progress are saved in a "Voice Mirror" folder in your Drive, not on this device.</p>
+    <label for="sClient">Google client ID</label>
+    <input id="sClient" placeholder="1234-abcd.apps.googleusercontent.com" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="stack">
+      <button type="button" id="btnDrive">Connect Google Drive</button>
+      <button type="button" id="btnDriveMove">Move audio on this device to Drive</button>
+    </div>
+    <p class="small muted" id="driveMsg" style="margin:6px 0 0"></p>
+
+    <details style="margin-top:14px">
+      <summary>Advanced</summary>
+      <label for="sVoiceId">Voice ID</label>
+      <input id="sVoiceId" placeholder="voice_id">
+      <label for="sModel">Model</label>
+      <select id="sModel">
+        <option value="eleven_v3">Eleven v3 (expressive, understands [tags])</option>
+        <option value="eleven_multilingual_v2">Multilingual v2 (steadier, tags removed)</option>
+      </select>
+      <label for="sStab">Delivery stability</label>
+      <select id="sStab">
+        <option value="0">Creative (most expressive)</option>
+        <option value="0.5">Natural</option>
+        <option value="1">Robust (most consistent)</option>
+      </select>
+      <p class="small muted" id="chars" style="margin:12px 0 0"></p>
+    </details>
+
+    <div class="foot">
+      <button value="cancel">Cancel</button>
+      <button class="primary" id="btnSave" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="config.js"></script>
+<script src="drive.js"></script>
+<script>
+// ---------- Curriculum ----------
+const VOICE_WEEKS = ['Week 1 · Pace, pauses, landing','Week 2 · Emphasis','Week 3 · Melody','Week 4 · Articulation','Week 5 · Power & presence'];
+const VOICE_DAYS = [
+ {t:'Baseline', base:true, tip:'Record each sentence once, the way you normally speak. Do not polish it. This is what Day 30 gets compared against.', d:[
+  ["[calm] Hi, I'm Irshath. I build tools where engineering meets medicine."],
+  ["[confident] Every good device starts with one question: who is going to use it?"],
+  ["[warm] Thank you for having me. I'm really glad to be here."]]},
+ {t:'Slow down', tip:'Match the clone\'s speed exactly. Most people speak faster than they think when they are nervous.', d:[
+  ["[calm] Slow is smooth... and smooth is fast.","Feel the gap at the dots."],
+  ["[calm] Let me walk you through this... one step at a time."],
+  ["[serious] The first version failed. The second one taught us why."]]},
+ {t:'The pause before the point', tip:'A short silence right before the key word makes people lean in. Do not fill it with "uh".', d:[
+  ["[confident] There is one thing that changed everything... feedback."],
+  ["[serious] We tested it with real doctors... and the results surprised us."],
+  ["[confident] The answer is simple... measure first, then build."]]},
+ {t:'Land the sentence', tip:'Statements end with a falling pitch and a slightly longer last word. A rising end sounds like you are asking for permission.', d:[
+  ["[confident] This works. I've tested it.","Watch the blue line drop at the end."],
+  ["[serious] We start on Monday."],
+  ["[confident] That is the problem we are solving."]]},
+ {t:'Breath and phrasing', tip:'One phrase per breath. Commas are places to breathe, not places to rush through.', d:[
+  ["[calm] When you design for clinicians, you design for tired hands, long days, and zero room for error."],
+  ["[calm] I studied biomedical engineering, then micro and nano technology, and now I work on endoscopy."],
+  ["[serious] One breath... one idea."]]},
+ {t:'Review: your introduction', tip:'Combine pace, pauses and falling endings in your real introduction.', d:[
+  ["[confident] My name is Irshath Ali Syed. I'm a PhD candidate at the University Hospital Würzburg."],
+  ["[warm] I build tools that I hope make a real difference for clinicians and their patients."],
+  ["[confident] I still approach every project the way I approached my first one... curious, and hands-on."]]},
+
+ {t:'Moving stress', tip:'Same words, different meaning. Listen for which word gets longer, louder and higher.', d:[
+  ["I NEVER said she stole my money.","Meaning: I deny it."],
+  ["I never said SHE stole my money.","Meaning: someone else did."],
+  ["I never said she stole MY money.","Meaning: it was someone else's money."]]},
+ {t:'Contrast', tip:'When two ideas are opposed, both contrast words get stress, the second one more.', d:[
+  ["[confident] Not FASTER... BETTER."],
+  ["[serious] It's not a HARDWARE problem. It's a WORKFLOW problem."],
+  ["[confident] We didn't build it for engineers. We built it for DOCTORS."]]},
+ {t:'Numbers', tip:'Numbers are the facts people remember. Slow down on them and give them weight.', d:[
+  ["[confident] The price dropped from FORTY euros to TWELVE."],
+  ["[serious] Three out of FOUR people said the same thing."],
+  ["[confident] It runs for TEN hours on a single charge."]]},
+ {t:'One word per sentence', tip:'Pick one word to carry the sentence. Everything else stays lighter.', d:[
+  ["[confident] The real problem is TIME."],
+  ["[serious] Every second COUNTS in the endoscopy room."],
+  ["[confident] Simplicity is the hardest thing to BUILD."]]},
+ {t:'Stress by stretching', tip:'You do not need volume to emphasise. Stretching a word and slowing down works better and sounds calmer.', d:[
+  ["[calm] It was... really... hard."],
+  ["[warm] That moment changed how I SEE engineering."],
+  ["[serious] We have to get this RIGHT."]]},
+ {t:'Review: emphasis', tip:'Then write three sentences from your own work in "Your own" and stress one word in each.', d:[
+  ["[confident] It's SMALL, it's CHEAP, and it WORKS."],
+  ["[serious] I don't need it to be perfect. I need it to be USED."],
+  ["[confident] That's not a feature. That's the PRODUCT."]]},
+
+ {t:'Rise vs fall', tip:'Same words: a rise asks, a fall tells. Compare the end of the blue line in drill 1 and 2.', d:[
+  ["[curious] You've tried this before?","Rises at the end."],
+  ["[confident] You've tried this before.","Falls at the end."],
+  ["[curious] Would you like the short version, or the long one?","Up on 'short', down on 'long'."]]},
+ {t:'Lists', tip:'Lists go up, up, then down on the last item. That fall tells people the list is finished.', d:[
+  ["[confident] It's faster, cheaper, and easier to use."],
+  ["[calm] We need data, time, and a little patience."],
+  ["[confident] Design it, test it, ship it."]]},
+ {t:'Pitch range', tip:'Monotone is the most common problem in technical speakers. Let your pitch move more than feels natural.', d:[
+  ["[excited] This is the part I love the most!"],
+  ["[calm] And then... nothing happened."],
+  ["[excited] It worked! On the very first try!"]]},
+ {t:'Questions to the audience', tip:'A real question has a real rise and a pause after it. Give people time to think.', d:[
+  ["[curious] Have you ever wondered why endoscopists end up with back pain?"],
+  ["[curious] What if a tool could warn you before the pain starts?"],
+  ["[curious] So... what does that mean for us?"]]},
+ {t:'Story melody', tip:'Stories move between quiet set-up and lifted payoff. Follow the shape, not just the words.', d:[
+  ["[warm] In 2018, I walked into a small 3D printing lab... and I've been building things ever since."],
+  ["[serious] The first prototype didn't work. Neither did the second."],
+  ["[excited] And then, one evening... it finally clicked."]]},
+ {t:'Review: melody', tip:'Mix rises, falls and lists in one go.', d:[
+  ["[confident] Here's what we learned, why it matters, and what comes next."],
+  ["[curious] Ever tried explaining your PhD in one sentence?"],
+  ["[warm] Honestly? I'm still learning. Every single day."]]},
+
+ {t:'Final consonants', tip:'Finish every word. T, D, K and S at the ends of words disappear first when you speak fast.', d:[
+  ["[calm] Test it, check it, then ship it."],
+  ["[calm] The robot's sensors picked up eight distinct signals."],
+  ["[calm] Asked, tasked, and finished fast."]]},
+ {t:'Tongue twisters', tip:'Start at 0.75×, get it clean, then go to 1×. Clean beats fast.', d:[
+  ["[calm] Red lorry, yellow lorry, red lorry, yellow lorry."],
+  ["[calm] She sells seashells by the seashore."],
+  ["[calm] Unique New York, unique New York, you know you need unique New York."]]},
+ {t:'Technical words', tip:'Long words have one main stressed syllable. Listen for it: en-DOS-copy, er-go-NOM-ics.', d:[
+  ["[calm] Endoscopy, gastroenterology, and ergonomics."],
+  ["[calm] The microcontroller handles the haptic feedback in real time."],
+  ["[calm] Micro and nano technology, biomedical engineering, embedded systems."]]},
+ {t:'Linking', tip:'Natural speech joins words: "pick it up" sounds like "pi-ki-tup". Copy the flow, not the spelling.', d:[
+  ["[calm] Pick it up and put it on."],
+  ["[calm] What are you going to do about it?"],
+  ["[calm] Turn it off and on again."]]},
+ {t:'Clarity at speed', tip:'Keep the consonants crisp even when the pace goes up.', d:[
+  ["[excited] We designed it, built it, tested it and shipped it in six weeks."],
+  ["[confident] Firmware, hardware, software... it all has to talk to each other."],
+  ["[calm] Precise, practical, and properly tested."]]},
+ {t:'Review: articulation', tip:'Your department name is a mouthful. Make it effortless.', d:[
+  ["[confident] Department of Digital Transformation for Endoscopy."],
+  ["[calm] Truly rural, truly rural, truly rural."],
+  ["[confident] Precise engineering for people who save lives."]]},
+
+ {t:'Authority', tip:'Low, steady, falling. No rush, no rise, no filler.', d:[
+  ["[serious] Here is what we're going to do."],
+  ["[confident] I'm sure. I've checked it twice."],
+  ["[serious] This is not optional."]]},
+ {t:'Warmth', tip:'Warmth is a slightly softer onset and a smile you can hear. Try it with an actual smile.', d:[
+  ["[warm] I'd love to hear what you're working on."],
+  ["[warm] Thank you. That genuinely means a lot."],
+  ["[warm] Take your time. There's no rush."]]},
+ {t:'Energy without speed', tip:'Excitement goes into pitch and volume, not into talking faster.', d:[
+  ["[excited] I can't wait to show you this."],
+  ["[excited] This could change how doctors train."],
+  ["[excited] We're just getting started!"]]},
+ {t:'Your pitch lines', tip:'Short openers about your real work. Use everything: pauses, stress, falling endings.', d:[
+  ["[confident] Endoscopists spend hours bent over a screen. Their bodies pay the price. We're building a way to see it... before it hurts."],
+  ["[confident] Your first time feeling the instrument shouldn't be on a real patient. That's why we're building a simulator you can actually feel."],
+  ["[confident] I'm Irshath. I build hardware that helps the people who help others."]]},
+ {t:'Your full introduction', tip:'Your introduction, start to finish, at your best.', d:[
+  ["[warm] Hi, I'm Irshath Ali Syed. I'm a Research Associate and PhD candidate at the University Hospital Würzburg."],
+  ["[warm] My journey started with a 3D-printed prosthetic hand. It taught me how much a carefully made device can mean to the person using it."],
+  ["[confident] Today, I work on tools that support endoscopists... and I'm still learning, every single day."]]},
+ {t:'Retake the baseline', base:true, tip:'Same three sentences as Day 1. Record each once, naturally, then open "Day 1 vs Day 30" below.', d:[
+  ["[calm] Hi, I'm Irshath. I build tools where engineering meets medicine."],
+  ["[confident] Every good device starts with one question: who is going to use it?"],
+  ["[warm] Thank you for having me. I'm really glad to be here."]]},
+];
+
+// ---------- Humour & Leadership track ----------
+// Punchline delivery follows Pickering et al. (2009): punchlines are lower in pitch and slower, not louder, with no big pause.
+const PUNCH = "Punchline: drop your pitch and slow down. Not louder, no big pause.";
+const HUMOUR_WEEKS = ['Week 1 · Notice & tell','Week 2 · Joke structures','Week 3 · Warm conversation','Week 4 · Bold voice','Week 5 · Funny leader'];
+const HUMOUR_DAYS = [
+ {t:"Baseline", base:true, tip:"Record each line once, naturally. Day 30 gets compared against this.", m:"Start Homework for Life tonight: write one sentence about the most story-worthy moment of your day. Do it every night for 30 days.", d:[
+  ["[playful] I moved to Germany thinking I'd learn the language. So far I've mostly learned the recycling rules."],
+  ["[warm] I build tools for doctors. Basically, I make very expensive things for people who are too busy to read the manual."],
+  ["[curious] Wait, so how did you end up doing that?"]]},
+ {t:"Notice the gap", tip:"Most everyday humour is the gap between what was supposed to happen and what did. "+PUNCH, m:"Write down three small 'that is not how it was supposed to go' moments today.", d:[
+  ["[amused] I bought a standing desk to be healthier. Now I sit at a standing desk."],
+  ["[deadpan] German trains have taught me patience. And the word Verspätung."],
+  ["[playful] I spent three hours automating a task that takes five minutes. Engineering."]]},
+ {t:"Story shape", tip:"Set-up, turn, done. Thirty seconds, not three minutes. "+PUNCH, m:"Turn one Homework for Life entry into a three-sentence story.", d:[
+  ["[warm] Last week my prototype finally worked... right up until I showed it to someone."],
+  ["[playful] I told my supervisor it would take two weeks. That was in spring."],
+  ["[amused] The demo worked perfectly. Nobody was in the room."]]},
+ {t:"Act it out", tip:"Quoting a person, or a machine, is funnier than describing them. Change your voice slightly for the quote.", m:"In one story today, quote what someone said instead of summarising it.", d:[
+  ["[playful] And my code just looks at me like... are you sure about that?"],
+  ["[amused] The printer says paper jam. There is no paper in the printer."],
+  ["[warm] My mom on the phone: are you eating properly? Me, holding cereal at ten p.m.: of course."]]},
+ {t:"Specific beats general", tip:"A specific detail is funnier than a general one. 'Coffee' is fine, 'three espressos and a croissant I didn't deserve' is a joke.", m:"Add one specific detail to every story you tell today.", d:[
+  ["[playful] Not just coffee. Three espressos and a croissant I didn't deserve."],
+  ["[deadpan] I didn't just miss the bus. I waved at it."],
+  ["[amused] It wasn't a small bug. It was a bug with a family."]]},
+ {t:"Review: tell it", tip:"Put it together: a short opener, a specific story, a clean ending.", m:"Tell one of your Homework for Life moments to one person this week. Watch their face, not your script.", d:[
+  ["[warm] Okay, quick story. You'll like this one."],
+  ["[playful] So there I am, confident, prepared... and completely in the wrong room."],
+  ["[amused] Anyway. That's why I now double-check everything. Twice."]]},
+
+ {t:"Misdirection", tip:"The set-up builds an assumption, the punchline flips it. Keep the set-up neutral so the turn lands. "+PUNCH, m:"Write two misdirection lines about your own week in the 'Your own' tab.", d:[
+  ["[deadpan] I'm great at multitasking. I can procrastinate, overthink and worry, all at once."],
+  ["[playful] I have a great relationship with deadlines. We see each other... occasionally."],
+  ["[amused] My plants are thriving. Well, one of them is plastic."]]},
+ {t:"Rule of three", tip:"Two normal items set a pattern, the third breaks it. The surprise goes last.", m:"Describe your weekend to someone with a rule-of-three line.", d:[
+  ["[playful] To survive a PhD you need three things: curiosity, patience, and a very good coffee machine."],
+  ["[amused] My weekend plans: rest, read, and accidentally redesign a circuit board."],
+  ["[warm] Germany gave me three things: discipline, precision, and a deep fear of jaywalking."]]},
+ {t:"Exaggeration", tip:"Blow it up until it is clearly impossible. Commit fully, with a straight face.", m:"Use one exaggeration in a conversation today.", d:[
+  ["[excited] The meeting was so long, I aged. Visibly."],
+  ["[playful] I've rebooted that machine so often, we're basically in a relationship."],
+  ["[amused] My inbox has its own weather system."]]},
+ {t:"Understatement", tip:"The opposite of exaggeration: describe something big as if it were small. Dry, calm, slow.", m:"When something goes wrong today, describe it with an understatement.", d:[
+  ["[deadpan] The prototype caught fire. So, not ideal."],
+  ["[deadpan] We're slightly behind schedule. By a season."],
+  ["[deadpan] The first version was... a learning experience."]]},
+ {t:"Callbacks", tip:"Bring back something said earlier. It feels like an inside joke you built together.", m:"In one conversation this week, bring back something the other person said earlier.", d:[
+  ["[warm] Remember the plastic plant? Same energy as this project plan."],
+  ["[playful] And that is the second time the demo worked with nobody in the room."],
+  ["[amused] So yes, still in a relationship with that machine."]]},
+ {t:"Review: structures", tip:"Write three of your own in 'Your own' using this week's structures, then drill them.", m:"Use any one structure from this week on someone new.", d:[
+  ["[playful] I'm not addicted to coffee. The coffee machine just knows my schedule."],
+  ["[deadpan] It's not a bug. It's a surprise feature."],
+  ["[amused] My to-do list has a to-do list."]]},
+
+ {t:"Follow-up questions", tip:"People who ask more follow-up questions are liked more (Huang et al., 2017). Curious tone: real rise at the end.", m:"In every conversation today, ask two follow-up questions before you talk about yourself.", d:[
+  ["[curious] Wait, how did that happen?"],
+  ["[curious] And then what did you do?"],
+  ["[warm] That sounds intense. What was the hardest part?"]]},
+ {t:"Names and greetings", tip:"Warm greetings start higher and brighter. A name said warmly does a lot of work.", m:"Use three people's names today.", d:[
+  ["[warm] Sarah! Good to see you. How was the trip?"],
+  ["[excited] Hey, you made it! Come, sit."],
+  ["[warm] Nice to meet you, Jonas. I'll remember that... Jonas, Jonas, Jonas."]]},
+ {t:"Playful, not stinging", tip:"Tease the situation, not the person. If it could sting, swap it for a playful compliment.", m:"Catch one sarcastic line before you say it and turn it into a playful compliment.", d:[
+  ["[playful] You brought cake? Okay, you're officially my favourite colleague today."],
+  ["[amused] That's a bold opinion. I respect it. I'm also a little scared of it."],
+  ["[playful] You fixed it in ten minutes? I'm choosing to be inspired, not jealous."]]},
+ {t:"Self-aware, not self-defeating", tip:"Own the mistake, keep your status. Not 'I'm so stupid', but 'well, that was a choice'. Light, then move on.", m:"The next time you mess up, use a self-aware line and fix it, no put-down.", d:[
+  ["[amused] Well. That was a choice."],
+  ["[confident] My mistake. I'll fix it by lunch."],
+  ["[playful] In my defence, it made sense at two in the morning."]]},
+ {t:"Specific appreciation", tip:"Name exactly what the person did. Specific praise sounds sincere, generic praise sounds polite.", m:"Give one specific, sincere compliment to a colleague today.", d:[
+  ["[warm] The way you explained that was really clear. I'm stealing it."],
+  ["[warm] Thanks for staying late yesterday. It made a real difference."],
+  ["[warm] Honestly, that was the best idea in the meeting."]]},
+ {t:"Review: a mini conversation", tip:"Curious question, playful reaction, warm close.", m:"Have one five-minute conversation where the other person talks most of the time.", d:[
+  ["[curious] So what are you working on these days?"],
+  ["[amused] Wait, so the robot was smarter than the manual?"],
+  ["[warm] I love that. Let's grab a coffee and you tell me the whole story."]]},
+
+ {t:"Opinion first", tip:"Say what you think before explaining it. Falling ending, no 'maybe', 'just' or 'sort of'.", m:"In one meeting, give your opinion before anyone asks.", d:[
+  ["[confident] Here's what I think."],
+  ["[confident] I'd do it differently. Let me explain why."],
+  ["[serious] I disagree, and here's why."]]},
+ {t:"Drop the softeners", tip:"Softeners make good ideas sound unsure. Say it plainly, then stop.", m:"Write one message today with no 'just', 'maybe' or 'sorry to bother'.", d:[
+  ["[confident] I recommend option two."],
+  ["[confident] This won't work as it is. Here's the fix."],
+  ["[confident] I need this by Friday."]]},
+ {t:"Status through stillness", tip:"Slow pace, real pauses, no rushing to fill silence. Calm reads as confident (Johnstone's status work).", m:"Pause for one full breath before answering a question today.", d:[
+  ["[calm] Let's take a step back... What problem are we actually solving?"],
+  ["[confident] Good question... Here's the short answer."],
+  ["[calm] I'm not in a hurry. Let's get this right."]]},
+ {t:"Disagree warmly", tip:"Acknowledge first, then disagree clearly. Warm voice, firm words.", m:"Disagree with one idea today, warmly and out loud.", d:[
+  ["[warm] I see why you'd think that. I see it differently."],
+  ["[confident] Fair point. And here's what worries me."],
+  ["[warm] I like where this is going. Can I push back on one thing?"]]},
+ {t:"Calm under pressure", tip:"Slow, low, downward inflection (Voss). Name the feeling, then steer.", m:"In one tense moment, name what the other person is worried about.", d:[
+  ["[calm] It sounds like the deadline is the real worry here."],
+  ["[calm] How am I supposed to do that by tomorrow?"],
+  ["[calm] Let's look at what we can control."]]},
+ {t:"Review: lead the moment", tip:"Short, clear, structured. Then thank people.", m:"Give a 60-second update to your group, structured as three points.", d:[
+  ["[confident] Okay, everyone, quick update. Three things."],
+  ["[confident] Decision: we go with the simpler design."],
+  ["[warm] Thanks, team. Good work today."]]},
+
+ {t:"Light openers", tip:"One light line at the start of a meeting relaxes the room. Then get to business. "+PUNCH, m:"Open one meeting or call with a light line.", d:[
+  ["[playful] Okay, let's start before the coffee wears off."],
+  ["[amused] Good news and bad news. The good news is, there's cake."],
+  ["[playful] I'll keep this short. Engineer short, so... medium."]]},
+ {t:"Defuse, then lead", tip:"A light line releases tension, then the serious plan follows straight away. Humour plus a plan reads as leadership.", m:"When something goes wrong, use one light line, then state the next step.", d:[
+  ["[amused] Well, the server has chosen chaos today. Here's the plan."],
+  ["[playful] Okay, that went sideways. Good news, sideways is still a direction. Next step."],
+  ["[calm] Deep breath, everyone. It's a bug, not a fire. Let's fix it."]]},
+ {t:"Yes, and", tip:"Build on what the other person says instead of steering back to your point. This is where situational humour comes from.", m:"In one conversation, build on the other person's idea three times in a row.", d:[
+  ["[playful] Yes, and if it breaks again, we give it a name."],
+  ["[amused] Yes, and we put that on a T-shirt."],
+  ["[warm] Yes, and let's actually try that."]]},
+ {t:"Celebrate people", tip:"A short toast: one specific thing, one light line, one sincere line.", m:"Publicly thank one person for something specific this week.", d:[
+  ["[warm] To Lena, who fixed in one afternoon what took me a week to break."],
+  ["[playful] Three months, two prototypes, and one very patient team. Cheers."],
+  ["[warm] I'm proud to work with you. Genuinely."]]},
+ {t:"Your lighter introduction", tip:"Your introduction with one light line, then a question back.", m:"Use this introduction with someone new.", d:[
+  ["[warm] Hi, I'm Irshath. I build tools for doctors... which mostly means I break things professionally, and then fix them."],
+  ["[playful] I'm doing a PhD in Würzburg. So, a student with better excuses."],
+  ["[warm] What about you? What keeps you busy?"]]},
+ {t:"Retake the baseline", base:true, tip:"Same three lines as Day 1. Record each once, naturally, then open 'Day 1 vs Day 30' below.", m:"Read back your 30 Homework for Life entries. Pick the three best stories.", d:[
+  ["[playful] I moved to Germany thinking I'd learn the language. So far I've mostly learned the recycling rules."],
+  ["[warm] I build tools for doctors. Basically, I make very expensive things for people who are too busy to read the manual."],
+  ["[curious] Wait, so how did you end up doing that?"]]},
+];
+
+const TRACKS = {
+  voice:{name:'Voice', weeks:VOICE_WEEKS, days:VOICE_DAYS, prefix:'d'},
+  humour:{name:'Humour & Leadership', weeks:HUMOUR_WEEKS, days:HUMOUR_DAYS, prefix:'h'}
+};
+let WEEKS = VOICE_WEEKS, DAYS = VOICE_DAYS;
+
+// ---------- Storage ----------
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
+};
+let settings = LS.get('vm_settings',{key:'',voice:'',model:'eleven_v3',stability:'0.5'});
+let progress = LS.get('vm_progress',{});
+if(!progress || typeof progress!=='object') progress = {};
+if(!progress.voice && !progress.humour) progress = {voice:progress, humour:{}};
+progress.voice = progress.voice || {}; progress.humour = progress.humour || {};
+let chars = LS.get('vm_chars',0);
+// Set when the page is served by server.py, which forwards ElevenLabs calls with the key from .env
+const PROXY = { on:false, hasKey:false, voiceId:'' };
+function voiceId(){ return settings.voice || PROXY.voiceId; }
+function haveKey(){ return !!settings.key || (PROXY.on && PROXY.hasKey); }
+
+let dbp;
+function db(){
+  if(!dbp) dbp = new Promise((res,rej)=>{
+    const r = indexedDB.open('voicemirror',1);
+    r.onupgradeneeded = ()=>{ r.result.createObjectStore('tts'); r.result.createObjectStore('takes'); };
+    r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error);
+  });
+  return dbp;
+}
+async function idbGet(store,key){
+  try{ const d=await db(); return await new Promise((res,rej)=>{ const q=d.transaction(store).objectStore(store).get(key); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+  catch{ return undefined; }
+}
+async function idbPut(store,key,val){
+  try{ const d=await db(); await new Promise((res,rej)=>{ const t=d.transaction(store,'readwrite'); t.objectStore(store).put(val,key); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+  catch(e){ console.warn(e); }
+}
+async function idbKeys(store){
+  try{ const d=await db(); return await new Promise((res,rej)=>{ const q=d.transaction(store).objectStore(store).getAllKeys(); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+  catch{ return []; }
+}
+async function idbDelete(store,key){
+  try{ const d=await db(); await new Promise((res,rej)=>{ const t=d.transaction(store,'readwrite'); t.objectStore(store).delete(key); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+  catch(e){ console.warn(e); }
+}
+
+// ---------- Audio store: Google Drive when connected, else this browser ----------
+const memCache = {tts:new Map(), takes:new Map()};
+function remember(kind,key,blob){ const m=memCache[kind]; m.delete(key); m.set(key,blob); if(m.size>40) m.delete(m.keys().next().value); }
+function extFor(type){ return /ogg/.test(type)?'ogg':/mp4|aac/.test(type)?'m4a':/mpeg|mp3/.test(type)?'mp3':'webm'; }
+async function driveNameFor(kind,key,blob){ return kind==='tts' ? `tts-${await Drive.hash(key)}.mp3` : `take-${key}.${extFor(blob?.type||'')}`; }
+function driveDesc(kind,key){ return kind==='tts' ? key.split('|').slice(3).join('|') : 'Recording '+key; }
+
+async function audioGet(kind,key){
+  const m=memCache[kind]; if(m.has(key)) return m.get(key);
+  let blob = await idbGet(kind,key);
+  if(!blob && Drive.connected()){
+    try{
+      const name = kind==='tts' ? await driveNameFor(kind,key) : await Drive.nameStarting(`take-${key}.`);
+      blob = name ? await Drive.getBlob(name) : null;
+    }catch(e){ driveProblem(e); const err=new Error(e.message); err.drive=true; throw err; }
+  }
+  if(blob) remember(kind,key,blob);
+  return blob || undefined;
+}
+// Returns where the audio ended up: 'drive' or 'device' (Drive unavailable, kept locally).
+async function audioPut(kind,key,blob){
+  remember(kind,key,blob);
+  if(Drive.connected()){
+    try{ await Drive.putBlob(await driveNameFor(kind,key,blob), blob, driveDesc(kind,key)); driveOk(); return 'drive'; }
+    catch(e){ driveProblem(e); }
+  }
+  await idbPut(kind,key,blob);
+  return 'device';
+}
+
+// ---------- Google Drive status, progress sync ----------
+const driveClientId = ()=> LS.get('vm_drive_client','') || (window.VM_CONFIG && window.VM_CONFIG.driveClientId) || '';
+function driveOk(){ $('#driveBar').hidden = true; }
+function driveProblem(e){
+  const bar=$('#driveBar'), signIn = !Drive.hasToken() || e.code==='auth' || e.code==='not_connected';
+  bar.classList.toggle('err', !signIn);
+  bar.textContent = signIn ? 'Google Drive needs you to sign in. Tap here.' : e.message+' New audio is kept on this device until Drive is back.';
+  bar.hidden = false;
+}
+let progressSynced=false, pushTimer;
+function isObj(x){ return x && typeof x==='object' && !Array.isArray(x); }
+function mergeProgress(local,remote,key){
+  if(key==='last') return local ?? remote;
+  if(typeof local==='number' && typeof remote==='number') return Math.max(local,remote);
+  if(isObj(local) && isObj(remote)){
+    const o={...remote};
+    for(const k of Object.keys(local)) o[k] = k in remote ? mergeProgress(local[k],remote[k],k) : local[k];
+    return o;
+  }
+  return local ?? remote;
+}
+async function pullProgress(){
+  const j = await Drive.getJson('progress.json');
+  if(j){
+    progress = mergeProgress(progress, j.progress||{});
+    progress.voice = progress.voice||{}; progress.humour = progress.humour||{};
+    chars = Math.max(chars, j.chars||0); LS.set('vm_chars',chars);
+    if(!settings.voice && j.settings?.voice){ settings = {...settings, ...j.settings}; LS.set('vm_settings',settings); }
+    LS.set('vm_progress',progress);
+  }
+  progressSynced = true;
+  await pushProgress();
+}
+async function pushProgress(){
+  if(!Drive.connected() || !progressSynced) return;
+  try{
+    await Drive.putJson('progress.json',{v:1, savedAt:new Date().toISOString(), progress, chars, settings:{voice:voiceId(), model:settings.model, stability:settings.stability}}, 'Voice Mirror progress');
+    driveOk();
+  }catch(e){ driveProblem(e); }
+}
+function pushProgressSoon(){ if(!Drive.connected()) return; clearTimeout(pushTimer); pushTimer=setTimeout(pushProgress,2000); }
+async function afterDriveConnect(){
+  try{ await pullProgress(); driveOk(); }catch(e){ driveProblem(e); return; }
+  updateChars(); renderDays(); renderAttempts(); selectDrill(cur.drill);
+}
+async function moveLocalToDrive(){
+  const msg=$('#driveMsg');
+  try{
+    const jobs=[]; for(const kind of ['tts','takes']) for(const key of await idbKeys(kind)) jobs.push([kind,key]);
+    if(!jobs.length){ msg.textContent='Nothing on this device to move.'; return; }
+    let n=0;
+    for(const [kind,key] of jobs){
+      msg.textContent=`Moving ${++n} of ${jobs.length} to Drive…`;
+      const blob = await idbGet(kind,key); if(!blob) continue;
+      const name = await driveNameFor(kind,key,blob);
+      if(!(await Drive.has(name))) await Drive.putBlob(name, blob, driveDesc(kind,key));
+      await idbDelete(kind,key);
+    }
+    msg.textContent=`Moved ${jobs.length} file${jobs.length===1?'':'s'} to Drive and freed that space here.`;
+    driveOk();
+  }catch(e){ msg.textContent='Stopped: '+e.message+' Nothing was deleted that did not upload.'; driveProblem(e); }
+}
+function renderDriveUi(){
+  const on=Drive.connected();
+  $('#btnDrive').textContent = on ? 'Disconnect Google Drive' : 'Connect Google Drive';
+  $('#btnDriveMove').disabled = !on;
+  if(!$('#driveMsg').dataset.keep) $('#driveMsg').textContent = on ? `Connected. Files go to the "${Drive.FOLDER_NAME}" folder in your Drive.` : 'Not connected. Audio stays on this device.';
+}
+
+// ---------- State ----------
+const cur = { track:'voice', day:1, drill:0, text:'', model:null, take:null, slow:false, loop:false, busy:false };
+// model/take: {blob,url,an}
+const audioModel = new Audio(), audioTake = new Audio();
+audioModel.preservesPitch = true; audioTake.preservesPitch = true;
+
+function setStatus(msg,err){ const s=$('#status'); s.textContent=msg||''; s.classList.toggle('err',!!err); }
+function updateChars(){ $('#chars').textContent = `${chars.toLocaleString()} characters generated`; }
+function dayProg(day){ const P=progress[cur.track]; return P[day] || (P[day]={d:{}}); }
+function saveProg(){ LS.set('vm_progress',progress); pushProgressSoon(); }
+
+// ---------- Text ----------
+function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderText(raw){
+  let h = esc(raw);
+  h = h.replace(/\[([^\]]+)\]\s*/g,'<span class="tag">$1</span>');
+  h = h.replace(/\b([A-Z]{2,})\b/g,'<strong class="stress">$1</strong>');
+  return h;
+}
+function apiText(raw){
+  if(settings.model==='eleven_v3') return raw;
+  return raw.replace(/\[[^\]]*\]\s*/g,'').replace(/\b([A-Z]{2,})\b/g,w=>w.toLowerCase());
+}
+function ttsKey(text){ return [settings.model,voiceId(),settings.stability,text].join('|'); }
+
+// ---------- ElevenLabs ----------
+async function fetchModelAudio(raw, allowNetwork){
+  const text = apiText(raw);
+  const key = ttsKey(text);
+  let blob;
+  try{ blob = await audioGet('tts',key); }
+  catch(e){
+    if(!e.drive) throw e;
+    if(!allowNetwork) return null;
+    throw new Error("Can't check Google Drive for this clip, so nothing was generated and no credits were used. "+e.message);
+  }
+  if(blob) return {blob,cached:true};
+  if(!allowNetwork) return null;
+  const voice = voiceId();
+  if(!haveKey()) throw new Error('No API key yet. Add it in Settings, or to the .env file and restart the app.');
+  if(!voice) throw new Error('Pick your cloned voice in Settings first.');
+  const headers = {'Content-Type':'application/json','Accept':'audio/mpeg'};
+  if(settings.key) headers['xi-api-key'] = settings.key;
+  const url = PROXY.on
+    ? `/api/tts/${encodeURIComponent(voice)}`
+    : `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`;
+  const r = await fetch(url,{
+    method:'POST', headers,
+    body:JSON.stringify({text, model_id:settings.model, voice_settings:{stability:Number(settings.stability), similarity_boost:0.8}})
+  });
+  if(!r.ok){
+    let msg = `${r.status}`;
+    try{ const j=await r.json(); const d=j.detail; msg += ' ' + (typeof d==='string'?d:(d&&(d.message||JSON.stringify(d)))||''); }catch{}
+    throw new Error('ElevenLabs error: '+msg);
+  }
+  blob = await r.blob();
+  chars += text.length; LS.set('vm_chars',chars); updateChars(); pushProgressSoon();
+  const where = await audioPut('tts',key,blob);
+  return {blob,cached:false,where};
+}
+async function loadVoices(){
+  const key = $('#sKey').value.trim();
+  if(!key && !(PROXY.on && PROXY.hasKey)){ $('#voiceMsg').textContent='Enter your API key first.'; return; }
+  $('#voiceMsg').textContent='Loading voices…';
+  try{
+    const r = await fetch(PROXY.on ? '/api/voices' : 'https://api.elevenlabs.io/v1/voices',{headers: key ? {'xi-api-key':key} : {}});
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    const j = await r.json();
+    const vs = (j.voices||[]).sort((a,b)=>(b.category==='cloned')-(a.category==='cloned'));
+    const sel = $('#sVoice'); sel.innerHTML='';
+    for(const v of vs){ const o=document.createElement('option'); o.value=v.voice_id; o.textContent=`${v.name}${v.category?' · '+v.category:''}`; sel.appendChild(o); }
+    if(voiceId()) sel.value = voiceId();
+    $('#voiceMsg').textContent = `${vs.length} voices loaded. Your clones are listed first.`;
+  }catch(e){ $('#voiceMsg').textContent='Could not load voices: '+e.message; }
+}
+
+// ---------- Audio analysis ----------
+let actx;
+function ac(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+async function decode(blob){ return await ac().decodeAudioData(await blob.arrayBuffer()); }
+async function to16k(buf){
+  const sr=16000, len=Math.max(1,Math.ceil(buf.duration*sr));
+  const oc = new OfflineAudioContext(1,len,sr);
+  const s = oc.createBufferSource(); s.buffer=buf; s.connect(oc.destination); s.start();
+  return (await oc.startRendering()).getChannelData(0);
+}
+function median(a){ const b=a.filter(Number.isFinite).sort((x,y)=>x-y); return b.length?b[Math.floor(b.length/2)]:NaN; }
+function pct(a,p){ const b=a.filter(Number.isFinite).sort((x,y)=>x-y); return b.length?b[Math.min(b.length-1,Math.floor(p*b.length))]:NaN; }
+
+function analyze(x){
+  const sr=16000, hop=160, win=640, minLag=Math.floor(sr/400), maxLag=Math.floor(sr/70);
+  const rms=[], f0=[];
+  let maxR=0;
+  for(let s=0; s+win+maxLag<x.length; s+=hop){
+    let e=0; for(let i=0;i<win;i++) e+=x[s+i]*x[s+i];
+    const r=Math.sqrt(e/win); rms.push(r); f0.push(NaN); if(r>maxR) maxR=r;
+  }
+  const thr = maxR*0.1;
+  const corr = new Float32Array(maxLag+2);
+  for(let k=0;k<rms.length;k++){
+    if(rms[k]<thr) continue;
+    const s=k*hop;
+    let e0=0; for(let i=0;i<win;i++) e0+=x[s+i]*x[s+i];
+    let best=0;
+    for(let lag=minLag;lag<=maxLag;lag++){
+      let c=0,e1=0;
+      for(let i=0;i<win;i++){ const b=x[s+i+lag]; c+=x[s+i]*b; e1+=b*b; }
+      const v=c/Math.sqrt(e0*e1+1e-12); corr[lag]=v; if(v>best) best=v;
+    }
+    if(best<0.6) continue;
+    let L=0;
+    for(let lag=minLag+1;lag<maxLag;lag++){
+      if(corr[lag]>=0.88*best && corr[lag]>=corr[lag-1] && corr[lag]>=corr[lag+1]){ L=lag; break; }
+    }
+    if(!L) continue;
+    const a=corr[L-1], b=corr[L], c=corr[L+1], d=a-2*b+c;
+    const lf = d!==0 ? L+0.5*(a-c)/d : L;
+    f0[k]=sr/lf;
+  }
+  // median-filter pitch to drop outliers
+  const f0m = f0.map((v,i)=>{ if(!Number.isFinite(v)) return NaN; const w=f0.slice(Math.max(0,i-2),i+3); return median(w); });
+  let first = rms.findIndex(r=>r>=thr), last = rms.length-1;
+  while(last>0 && rms[last]<thr) last--;
+  if(first<0){ first=0; last=Math.max(0,rms.length-1); }
+  const med = median(f0m.slice(first,last+1));
+  const st = f0m.map(v=>Number.isFinite(v)&&med ? 12*Math.log2(v/med) : NaN);
+  return { rms, st, first, last, dur:(last-first+1)*hop/sr, maxR, voiced: st.filter(Number.isFinite).length };
+}
+
+const N = 150;
+function resampleTrack(arr, first, last, fill){
+  const out = new Array(N);
+  for(let i=0;i<N;i++){ const k=Math.round(first + (last-first)*i/(N-1)); out[i]=arr[k]; }
+  if(!fill) return out;
+  // linear interpolation over gaps, hold ends
+  const idx = out.map((v,i)=>Number.isFinite(v)?i:-1).filter(i=>i>=0);
+  if(!idx.length) return out.map(()=>0);
+  for(let i=0;i<N;i++){
+    if(Number.isFinite(out[i])) continue;
+    let p=-1,n=-1;
+    for(const j of idx){ if(j<i) p=j; else { n=j; break; } }
+    out[i] = p<0 ? out[n] : n<0 ? out[p] : out[p]+(out[n]-out[p])*(i-p)/(n-p);
+  }
+  return out;
+}
+function smooth(a,w){ return a.map((_,i)=>{ let s=0,c=0; for(let j=Math.max(0,i-w);j<=Math.min(a.length-1,i+w);j++){ s+=a[j]; c++; } return s/c; }); }
+function corrcoef(a,b){
+  const n=a.length; let ma=0,mb=0; for(let i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n; mb/=n;
+  let num=0,da=0,db=0; for(let i=0;i<n;i++){ const x=a[i]-ma, y=b[i]-mb; num+=x*y; da+=x*x; db+=y*y; }
+  return da&&db ? num/Math.sqrt(da*db) : 0;
+}
+function tracks(an){
+  return {
+    pitchRaw: resampleTrack(an.st, an.first, an.last, false),
+    pitch: smooth(resampleTrack(an.st, an.first, an.last, true),2),
+    loud: smooth(resampleTrack(an.rms.map(r=>r/(an.maxR||1)), an.first, an.last, false).map(v=>v||0),2)
+  };
+}
+
+// ---------- Plot ----------
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function draw(){
+  const cv=$('#plot'), g=cv.getContext('2d');
+  const W = cv.width = cv.clientWidth*devicePixelRatio, H = cv.height = 220*devicePixelRatio;
+  g.clearRect(0,0,W,H);
+  const pad=10*devicePixelRatio;
+  const sets = [];
+  if(cur.model?.an) sets.push({t:tracks(cur.model.an), c:cssVar('--model')});
+  if(cur.take?.an) sets.push({t:tracks(cur.take.an), c:cssVar('--you')});
+  if(!sets.length){
+    g.fillStyle=cssVar('--muted'); g.font=`${13*devicePixelRatio}px system-ui`;
+    g.fillText('Play your clone to see its melody.', pad*2, H/2);
+    return;
+  }
+  const lo=-8, hi=8;
+  const y = v => H-pad - (Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(H-2*pad);
+  const x = i => pad + i/(N-1)*(W-2*pad);
+  // grid: median line
+  g.strokeStyle=cssVar('--line'); g.lineWidth=1; g.setLineDash([4,4]);
+  g.beginPath(); g.moveTo(pad,y(0)); g.lineTo(W-pad,y(0)); g.stroke(); g.setLineDash([]);
+  // loudness shading
+  for(const s of sets){
+    g.fillStyle = s.c; g.globalAlpha=0.12;
+    g.beginPath(); g.moveTo(x(0),H-pad);
+    s.t.loud.forEach((v,i)=>g.lineTo(x(i),H-pad - v*(H-2*pad)*0.9));
+    g.lineTo(x(N-1),H-pad); g.closePath(); g.fill(); g.globalAlpha=1;
+  }
+  // pitch lines (only where voiced)
+  for(const s of sets){
+    g.strokeStyle=s.c; g.lineWidth=3*devicePixelRatio; g.lineCap='round'; g.lineJoin='round';
+    g.beginPath(); let pen=false;
+    s.t.pitch.forEach((v,i)=>{
+      if(!Number.isFinite(s.t.pitchRaw[i])){ pen=false; return; }
+      if(!pen){ g.moveTo(x(i),y(v)); pen=true; } else g.lineTo(x(i),y(v));
+    });
+    g.stroke();
+  }
+  g.fillStyle=cssVar('--muted'); g.font=`${11*devicePixelRatio}px system-ui`;
+  g.fillText('higher', pad, pad+10*devicePixelRatio); g.fillText('lower', pad, H-pad-2);
+}
+function metrics(){
+  const m=cur.model?.an, t=cur.take?.an;
+  const f = v => Number.isFinite(v)?v.toFixed(1):'–';
+  const rng = an => pct(an.st.slice(an.first,an.last+1),0.9)-pct(an.st.slice(an.first,an.last+1),0.1);
+  $('#mDur').textContent = t&&m ? `${t.dur.toFixed(1)}s / ${m.dur.toFixed(1)}s` : m ? `– / ${m.dur.toFixed(1)}s` : '–';
+  $('#mRange').textContent = t&&m ? `${f(rng(t))} / ${f(rng(m))}` : m ? `– / ${f(rng(m))}` : '–';
+  if(t&&m){
+    if(t.voiced<10){ $('#mMel').textContent='too quiet'; $('#mStr').textContent='–'; return null; }
+    const A=tracks(m), B=tracks(t);
+    const mel = Math.max(0,corrcoef(A.pitch,B.pitch))*100;
+    const str = Math.max(0,corrcoef(A.loud,B.loud))*100;
+    $('#mMel').textContent = `${Math.round(mel)}%`;
+    $('#mStr').textContent = `${Math.round(str)}%`;
+    return {mel:Math.round(mel), str:Math.round(str)};
+  }
+  $('#mMel').textContent='–'; $('#mStr').textContent='–';
+  return null;
+}
+
+// ---------- Recording ----------
+let stream, recorder, recTimer;
+async function getStream(){
+  if(!stream) stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  return stream;
+}
+async function record(autoStopMs){
+  const s = await getStream();
+  recorder = new MediaRecorder(s);
+  const chunks=[];
+  recorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  const done = new Promise(res=>{ recorder.onstop = ()=>res(new Blob(chunks,{type:recorder.mimeType})); });
+  recorder.start();
+  const t0=Date.now();
+  $('#btnRec').textContent='■ Stop'; $('#btnRec').classList.add('rec');
+  recTimer = setInterval(()=>setStatus(`● Recording… ${((Date.now()-t0)/1000).toFixed(1)}s`),100);
+  if(autoStopMs) setTimeout(stopRec, autoStopMs);
+  const blob = await done;
+  clearInterval(recTimer);
+  $('#btnRec').textContent='● Record'; $('#btnRec').classList.remove('rec');
+  return blob;
+}
+function stopRec(){ if(recorder && recorder.state==='recording') recorder.stop(); }
+function recording(){ return recorder && recorder.state==='recording'; }
+
+function playEl(el, rate){
+  return new Promise(res=>{
+    el.loop=false; el.playbackRate=rate||1; el.currentTime=0;
+    el.onended=()=>res();
+    el.play().catch(()=>res());
+  });
+}
+
+// ---------- Flow ----------
+async function ensureModel(network=true){
+  if(cur.model) return cur.model;
+  const r = await fetchModelAudio(cur.text, network);
+  if(!r) return null;
+  const url = URL.createObjectURL(r.blob);
+  audioModel.src = url;
+  const buf = await decode(r.blob);
+  const an = analyze(await to16k(buf));
+  cur.model = {blob:r.blob, url, an};
+  $('#cacheBadge').hidden = false;
+  $('#cacheBadge').textContent = r.cached ? 'cached · no credits' : r.where==='drive' ? 'saved to Drive · replays are free' : 'saved on this device · replays are free';
+  draw(); metrics();
+  return cur.model;
+}
+async function guard(fn){
+  if(cur.busy) return;
+  cur.busy=true;
+  try{ await fn(); }
+  catch(e){ console.error(e); setStatus(e.message||String(e), true); }
+  finally{ cur.busy=false; }
+}
+async function handleTake(blob){
+  setStatus('Analysing…');
+  if(cur.take?.url) URL.revokeObjectURL(cur.take.url);
+  const url = URL.createObjectURL(blob);
+  audioTake.src = url;
+  const an = analyze(await to16k(await decode(blob)));
+  cur.take = {blob,url,an};
+  $('#btnMine').disabled=false; $('#btnAB').disabled=!cur.model;
+  draw();
+  const m = metrics();
+  if(cur.drill>=0){
+    const dp = dayProg(cur.day), e = dp.d[cur.drill] || (dp.d[cur.drill]={a:0});
+    e.a++; if(m){ e.last=m; e.best=Math.max(e.best||0,m.mel); }
+    saveProg(); renderAttempts();
+    if(DAYS[cur.day-1].base) await audioPut('takes',`${TRACKS[cur.track].prefix}${cur.day}-${cur.drill}`,blob);
+  }
+  setStatus(an.voiced<10 ? 'That was very quiet. Move closer to the mic and try again.' : 'Listen to A/B. Can you hear the difference?');
+}
+
+async function onPlayModel(){
+  await guard(async()=>{
+    setStatus('Getting your clone…');
+    const m = await ensureModel(true);
+    setStatus('');
+    audioModel.playbackRate = cur.slow?0.75:1; audioModel.loop = cur.loop; audioModel.currentTime=0;
+    await audioModel.play();
+  });
+}
+async function onEcho(){
+  await guard(async()=>{
+    setStatus('Getting your clone…');
+    const m = await ensureModel(true);
+    setStatus('Listen…');
+    await playEl(audioModel, cur.slow?0.75:1);
+    setStatus('Your turn — speak now. Click Stop when done.');
+    const blob = await record(Math.round(m.an.dur*2500+3000));
+    await handleTake(blob);
+  });
+}
+async function onShadow(){
+  await guard(async()=>{
+    setStatus('Getting your clone…');
+    const m = await ensureModel(true);
+    await getStream();
+    const p = record();
+    await new Promise(r=>setTimeout(r,250));
+    await playEl(audioModel, cur.slow?0.75:1);
+    await new Promise(r=>setTimeout(r,1200));
+    stopRec();
+    await handleTake(await p);
+  });
+}
+async function onRec(){
+  if(recording()){ stopRec(); return; }
+  await guard(async()=>{ setStatus('Speak now. Click Stop when done.'); await handleTake(await record()); });
+}
+async function onAB(){
+  if(!cur.model||!cur.take) return;
+  await playEl(audioModel, 1);
+  await new Promise(r=>setTimeout(r,400));
+  await playEl(audioTake, 1);
+}
+function rate(kind){
+  if(cur.drill<0){ setStatus('Ratings are tracked for plan drills.'); return; }
+  const dp = dayProg(cur.day), e = dp.d[cur.drill] || (dp.d[cur.drill]={a:0});
+  e.r = kind; if(kind==='nailed') e.n = true;
+  const n = DAYS[cur.day-1].d.length;
+  const allOk = [...Array(n).keys()].every(i=>dp.d[i] && (dp.d[i].n || dp.d[i].r==='close'));
+  if(allOk && !dp.done){ dp.done = new Date().toISOString().slice(0,10); }
+  saveProg(); renderDays(); renderAttempts();
+  if(kind==='nailed' && cur.drill < n-1){ selectDrill(cur.drill+1); setStatus('Nice. Next sentence.'); }
+  else if(allOk) setStatus('Day complete. Come back tomorrow.');
+  else setStatus(kind==='again' ? 'Listen again at 0.75× and copy just the ending first.' : 'Getting there. One more.');
+}
+
+// ---------- Render ----------
+function renderDays(){
+  const el=$('#days'); el.innerHTML='';
+  let done=0, att=0;
+  DAYS.forEach((d,i)=>{
+    if(i%6===0){ const w=document.createElement('div'); w.className='week'; w.textContent=WEEKS[i/6]; el.appendChild(w); }
+    const b=document.createElement('button'); b.textContent=i+1;
+    const p=progress[cur.track][i+1];
+    if(p){ att += Object.values(p.d||{}).reduce((s,e)=>s+(e.a||0),0); }
+    if(p?.done){ b.classList.add('done'); done++; }
+    else if(p && Object.keys(p.d||{}).length) b.classList.add('partial');
+    if(i+1===cur.day) b.classList.add('cur');
+    b.title=d.t; b.onclick=()=>{ selectDay(i+1); $('#plan').open=false; };
+    el.appendChild(b);
+  });
+  $('#overall').textContent = `${done}/30 · ${att} takes`;
+}
+function renderAttempts(){
+  if(cur.drill<0){ $('#attempts').textContent=''; return; }
+  const e = dayProg(cur.day).d[cur.drill];
+  if(!e){ $('#attempts').textContent='No takes yet'; return; }
+  const bits=[`${e.a||0} take${e.a===1?'':'s'}`];
+  if(e.best) bits.push(`best melody match ${e.best}%`);
+  if(e.n) bits.push('nailed ✓');
+  $('#attempts').textContent = bits.join(' · ');
+}
+function resetTakes(){
+  audioModel.pause(); audioTake.pause();
+  if(cur.model?.url) URL.revokeObjectURL(cur.model.url);
+  if(cur.take?.url) URL.revokeObjectURL(cur.take.url);
+  cur.model=null; cur.take=null;
+  $('#btnMine').disabled=true; $('#btnAB').disabled=true; $('#cacheBadge').hidden=true;
+  draw(); metrics(); setStatus('');
+}
+function selectDay(day){
+  cur.day=day; LS.set('vm_day_'+cur.track,day);
+  const d=DAYS[day-1];
+  $('#dayMission').hidden = !d.m;
+  $('#dayMission').innerHTML = d.m ? '<b>Real-world mission:</b> '+esc(d.m) : '';
+  $('#weekLabel').textContent = `${WEEKS[Math.floor((day-1)/6)]} · Day ${day}`;
+  $('#dayTitle').textContent = d.t;
+  $('#dayTip').textContent = d.tip;
+  const tabs=$('#tabs'); tabs.innerHTML='';
+  d.d.forEach((_,i)=>{ const b=document.createElement('button'); b.textContent=`Sentence ${i+1}`; b.onclick=()=>selectDrill(i); tabs.appendChild(b); });
+  const c=document.createElement('button'); c.textContent='Your own'; c.onclick=()=>selectDrill(-1); tabs.appendChild(c);
+  $('#baselineBox').hidden = !d.base;
+  if(d.base) renderBaseline();
+  renderDays(); selectDrill(0);
+}
+async function selectDrill(i){
+  cur.drill=i;
+  [...$('#tabs').children].forEach((b,j)=>b.classList.toggle('cur', (i<0 ? j===$('#tabs').children.length-1 : j===i)));
+  $('#customBox').hidden = i>=0;
+  resetTakes();
+  if(i>=0){
+    const [text,cue] = DAYS[cur.day-1].d[i];
+    cur.text=text;
+    $('#drillText').innerHTML = renderText(text);
+    $('#drillCue').textContent = cue||'';
+  } else {
+    cur.text = '';
+    $('#drillText').innerHTML = '<span class="muted" style="font-size:15px">Write a sentence above and click "Use this sentence".</span>';
+    $('#drillCue').textContent='';
+  }
+  renderAttempts();
+  if(cur.text) await guard(()=>ensureModel(false)); // load from cache only, no credits
+}
+async function renderBaseline(){
+  const list=$('#baselineList'); list.innerHTML='';
+  const d1=DAYS[0].d;
+  for(let i=0;i<d1.length;i++){
+    const px = TRACKS[cur.track].prefix;
+    const get = k=>audioGet('takes',k).catch(()=>undefined);
+    const a = await get(`${px}1-${i}`), b = await get(`${px}30-${i}`);
+    const row=document.createElement('div'); row.className='row';
+    const lbl=document.createElement('span'); lbl.textContent=`Sentence ${i+1}:`; row.appendChild(lbl);
+    for(const [name,blob] of [['Day 1',a],['Day 30',b]]){
+      const btn=document.createElement('button'); btn.textContent = blob?`▶ ${name}`:`${name}: not recorded`; btn.disabled=!blob;
+      if(blob) btn.onclick=()=>{ const au=new Audio(URL.createObjectURL(blob)); au.play(); };
+      row.appendChild(btn);
+    }
+    list.appendChild(row);
+  }
+}
+
+// ---------- Wire up ----------
+$('#btnModel').onclick = onPlayModel;
+$('#btnSlow').onclick = ()=>{ cur.slow=!cur.slow; $('#btnSlow').classList.toggle('on',cur.slow); audioModel.playbackRate=cur.slow?0.75:1; };
+$('#btnLoop').onclick = ()=>{ cur.loop=!cur.loop; $('#btnLoop').classList.toggle('on',cur.loop); audioModel.loop=cur.loop; };
+$('#btnEcho').onclick = onEcho;
+$('#btnShadow').onclick = onShadow;
+$('#btnRec').onclick = onRec;
+$('#btnMine').onclick = ()=>playEl(audioTake,1);
+$('#btnAB').onclick = onAB;
+$('#rAgain').onclick = ()=>rate('again');
+$('#rClose').onclick = ()=>rate('close');
+$('#rNailed').onclick = ()=>rate('nailed');
+$('#btnUseCustom').onclick = ()=>{
+  const t=$('#customText').value.trim(); if(!t) return;
+  const style=$('#customStyle').value;
+  resetTakes();
+  cur.text = (style?`[${style}] `:'') + t;
+  $('#drillText').innerHTML = renderText(cur.text);
+  setStatus('Click "Play my clone" to generate it.');
+};
+$('#btnSettings').onclick = ()=>{
+  $('#sKey').value=settings.key; $('#sVoiceId').value=voiceId(); $('#sModel').value=settings.model; $('#sStab').value=String(settings.stability);
+  $('#voiceMsg').textContent=''; $('#sClient').value=driveClientId(); delete $('#driveMsg').dataset.keep; renderDriveUi(); $('#dlg').showModal();
+  if(haveKey()) loadVoices();
+};
+$('#btnLoadVoices').onclick = loadVoices;
+$('#dayPrev').onclick = ()=>{ if(cur.day>1) selectDay(cur.day-1); };
+$('#dayNext').onclick = ()=>{ if(cur.day<DAYS.length) selectDay(cur.day+1); };
+$('#btnDriveMove').onclick = async ()=>{ $('#driveMsg').dataset.keep='1'; $('#btnDriveMove').disabled=true; await moveLocalToDrive(); $('#btnDriveMove').disabled=!Drive.connected(); };
+$('#btnDrive').onclick = async ()=>{
+  const msg=$('#driveMsg');
+  if(Drive.connected()){ Drive.disconnect(); progressSynced=false; driveOk(); delete msg.dataset.keep; renderDriveUi(); return; }
+  const id=$('#sClient').value.trim();
+  LS.set('vm_drive_client',id); Drive.configure(driveClientId());
+  msg.dataset.keep='1'; msg.textContent='Opening Google sign-in…';
+  try{ await Drive.connect(); delete msg.dataset.keep; renderDriveUi(); afterDriveConnect(); }
+  catch(e){ msg.textContent=e.message; }
+};
+$('#driveBar').onclick = async ()=>{
+  try{ await Drive.connect(); driveOk(); await afterDriveConnect(); }catch(e){ driveProblem(e); }
+};
+// Browsers only allow the sign-in pop-up after a tap, so retry once on the first tap if the silent attempt at start-up was blocked.
+let warmTried=false;
+addEventListener('pointerdown',ev=>{
+  if(warmTried || !Drive.connected() || Drive.hasToken() || ev.target.closest?.('#driveBar')) return;
+  warmTried=true;
+  Drive.ensureToken().then(()=>{ driveOk(); if(!progressSynced) return afterDriveConnect(); }).catch(()=>{});
+},true);
+$('#dlg').addEventListener('close',()=>{
+  if($('#dlg').returnValue!=='save') return;
+  const manual=$('#sVoiceId').value.trim(), picked=$('#sVoice').value;
+  settings = { key:$('#sKey').value.trim(), voice: (manual && manual!==settings.voice) ? manual : (picked||manual), model:$('#sModel').value, stability:$('#sStab').value };
+  LS.set('vm_settings',settings); pushProgressSoon();
+  selectDrill(cur.drill);
+});
+window.addEventListener('resize', draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
+
+updateChars();
+function setTrack(k){
+  if(!TRACKS[k]) k='voice';
+  cur.track=k; WEEKS=TRACKS[k].weeks; DAYS=TRACKS[k].days; LS.set('vm_track',k);
+  document.querySelectorAll('#trackSwitch button').forEach(b=>b.classList.toggle('cur', b.dataset.track===k));
+  $('#planTitle').textContent = TRACKS[k].name;
+  selectDay(LS.get('vm_day_'+k, k==='voice' ? LS.get('vm_day',1) : 1));
+}
+document.querySelectorAll('#trackSwitch button').forEach(b=>b.onclick=()=>setTrack(b.dataset.track));
+async function boot(){
+  try{
+    const r = await fetch('api/config',{cache:'no-store'});
+    if(r.ok){ const c = await r.json(); if(c && c.proxy){ PROXY.on=true; PROXY.hasKey=!!c.hasKey; PROXY.voiceId=c.voiceId||''; } }
+  }catch{ /* opened as a plain file: talk to ElevenLabs directly */ }
+  $('#keyRow').hidden = PROXY.on && PROXY.hasKey;
+  $('#keyNote').hidden = !(PROXY.on && PROXY.hasKey);
+  setTrack(LS.get('vm_track','voice'));
+  if(!haveKey()) setStatus('Start in Settings: add your ElevenLabs API key and pick your cloned voice.');
+  else if(!voiceId()) setStatus('Open Settings, click Load and pick your cloned voice.');
+  Drive.configure(driveClientId());
+  if(Drive.connected()){
+    try{ await Drive.ensureToken(); await afterDriveConnect(); }catch(e){ driveProblem(e); }
+  }
+  if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+boot();
+</script>
+</body>
+</html>
